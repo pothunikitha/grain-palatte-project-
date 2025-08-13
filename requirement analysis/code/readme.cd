@@ -1,0 +1,205 @@
+Rice Type Classification Using CNN
+Importing Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sb
+sb.set()
+import os
+import cv2
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+Reading Data
+reading data into the juypter notebook
+labeling the each image by its folder name or class name
+resizing the each image
+labels = []
+images = []
+
+for class_name in os.listdir('data/Rice_Image_Dataset'):
+    class_path = os.path.join('data/Rice_Image_Dataset', class_name)
+    files = os.listdir(class_path)[600:1200]
+    for file in files:
+        imag_path = os.path.join(class_path, file)
+        
+        img = cv2.imread(imag_path)
+        img = cv2.resize(img, (224,224))
+        
+        images.append(img)
+        labels.append(class_name)
+Preprocessing
+Normalizing
+x = np.array(images)/255
+y= np.array(labels)
+x.shape
+(3000, 224, 224, 3)
+y
+array(['Arborio', 'Arborio', 'Arborio', ..., 'Karacadag', 'Karacadag',
+       'Karacadag'], dtype='<U9')
+label Encoder
+le = LabelEncoder()
+
+labelled_y = le.fit_transform(y)
+labelled_y
+array([0, 0, 0, ..., 4, 4, 4], dtype=int64)
+onehot = to_categorical(labelled_y)
+onehot
+array([[1., 0., 0., 0., 0.],
+       [1., 0., 0., 0., 0.],
+       [1., 0., 0., 0., 0.],
+       ...,
+       [0., 0., 0., 0., 1.],
+       [0., 0., 0., 0., 1.],
+       [0., 0., 0., 0., 1.]], dtype=float32)
+Visualizing images
+fig, ax = plt.subplots(1, 4, figsize=(20, 4))
+ax[0].imshow(x[0])
+ax[0].set_title(y[0])
+
+ax[1].imshow(x[601])
+ax[1].set_title(y[601])
+
+ax[2].imshow(x[1902])
+ax[2].set_title(y[1902])
+
+ax[3].imshow(x[2126])
+ax[3].set_title(y[2126])
+Text(0.5, 1.0, 'Jasmine')
+
+Shuffling Data
+from sklearn.utils import shuffle
+
+shuffled_x, shuffled_y = shuffle(x,onehot,random_state = 42)
+Splitting Data
+from sklearn.model_selection import train_test_split
+
+x_train, x_test, y_train, y_test = train_test_split(shuffled_x, shuffled_y, test_size= 0.2, random_state = 42)
+Model Training
+model = Sequential([
+    Conv2D(32,(3,3), activation= 'relu', input_shape = (224,224,3)),
+    MaxPooling2D(pool_size= (2,2)),
+    Conv2D(64,(3,3), activation = 'relu'),
+    MaxPooling2D(pool_size= (2,2)),
+    Flatten(),
+    Dense(128, activation = 'relu'),
+    Dense(5,activation='softmax')
+])
+model.summary()
+Model: "sequential"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ conv2d (Conv2D)             (None, 222, 222, 32)      896       
+                                                                 
+ max_pooling2d (MaxPooling2D  (None, 111, 111, 32)     0         
+ )                                                               
+                                                                 
+ conv2d_1 (Conv2D)           (None, 109, 109, 64)      18496     
+                                                                 
+ max_pooling2d_1 (MaxPooling  (None, 54, 54, 64)       0         
+ 2D)                                                             
+                                                                 
+ flatten (Flatten)           (None, 186624)            0         
+                                                                 
+ dense (Dense)               (None, 128)               23888000  
+                                                                 
+ dense_1 (Dense)             (None, 5)                 645       
+                                                                 
+=================================================================
+Total params: 23,908,037
+Trainable params: 23,908,037
+Non-trainable params: 0
+_________________________________________________________________
+epochs = 3
+batch_size= 100
+from tensorflow.keras.callbacks import EarlyStopping
+callback = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+model.compile(optimizer= 'adam', loss= 'categorical_crossentropy', metrics= 'accuracy')
+history = model.fit(
+    x_train,
+    y_train,
+    epochs = epochs,
+    batch_size = batch_size,
+    callbacks = callback,
+    validation_data = (x_test, y_test),
+    verbose = 2
+)
+Epoch 1/3
+24/24 - 97s - loss: 1.1752 - accuracy: 0.7542 - val_loss: 0.1903 - val_accuracy: 0.9417 - 97s/epoch - 4s/step
+Epoch 2/3
+24/24 - 84s - loss: 0.0691 - accuracy: 0.9800 - val_loss: 0.0923 - val_accuracy: 0.9683 - 84s/epoch - 3s/step
+Epoch 3/3
+24/24 - 84s - loss: 0.0364 - accuracy: 0.9871 - val_loss: 0.0909 - val_accuracy: 0.9700 - 84s/epoch - 3s/step
+Visualizing Training, Validation Accuracy
+accu = history.history['accuracy']
+val = history.history['val_accuracy']
+epochs = range(1, len(accu) + 1)  # This line was missing in your code
+
+plt.figure(figsize=(8, 5))
+plt.plot(epochs, accu, label='Training Accuracy', marker='o')
+plt.plot(epochs, val, label='Validation Accuracy', marker='o')
+plt.title('Training vs Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+Saving the model
+model.save('rice.h5')
+Predicting data
+model.evaluate(x_test,y_test)
+19/19 [==============================] - 5s 219ms/step - loss: 0.0909 - accuracy: 0.9700
+[0.09094905853271484, 0.9700000286102295]
+y_pred = model.predict(x_test)
+19/19 [==============================] - 5s 219ms/step
+y_predict_label = np.argmax(y_pred,axis=1)
+y_pred_label = pd.Series(y_predict_label)
+mapping = {
+    0:'Arborio',
+    1:'Basmati',
+    2:'Ipsala',
+    3:'Jasmine',
+    4:'Karacadag'
+}
+y_predicted_classes = y_pred_label.map(mapping)
+y_predicted_classes
+0      Karacadag
+1        Jasmine
+2      Karacadag
+3         Ipsala
+4        Basmati
+         ...    
+595       Ipsala
+596      Basmati
+597       Ipsala
+598      Basmati
+599      Jasmine
+Length: 600, dtype: object
+Predicting single image
+img_path = "data/Rice_Image_Dataset/Jasmine/Jasmine (1014).jpg"
+sample_img = cv2.imread(img_path)
+resized_image = cv2.resize(sample_img, (224,224))
+
+transformed_img = resized_image/255
+
+plt.imshow(transformed_img)
+<matplotlib.image.AxesImage at 0x1c8f85292a0>
+
+img = np.expand_dims(transformed_img, axis=0)
+
+output = model.predict(img)
+output
+1/1 [==============================] - 0s 84ms/step
+array([[1.0317592e-03, 1.5303182e-03, 1.6975818e-07, 9.9743712e-01,
+        5.7116580e-07]], dtype=float32)
+predict = np.argmax(output)
+predict = pd.Series(predict)
+predict.map(mapping)
+0    Jasmine
+dtype: object
+ 
